@@ -256,7 +256,7 @@ def enviar_correos():
             mail.Subject = asuntoDef
             mail.HTMLBody = htmlDef
             if messagebox.askyesno(message="Se enviaran correos a los proveedores selecionados. ¿Desea continuar?"):
-                mail.Display()
+                mail.Send()
                 messagebox.showinfo("OK", "Correos generados correctamente en Outlook.")
                 
     except Exception as e:

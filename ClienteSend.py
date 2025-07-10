@@ -262,7 +262,6 @@ def enviar_correos():
             mail.Subject = asunto + ", ".join(pedidos_a_enviar)
             cuerpoFinal = cuerpo.replace("pedidoN", ", ".join(pedidos_a_enviar)).replace("\n", "<br>")
 
-            # --- Procesar imágenes Base64 embebidas ---
             img_matches = re.findall(r'<img[^>]+src="data:image/(.*?);base64,(.*?)"', firmaHtml, re.DOTALL)
             for i, (img_type, img_base64) in enumerate(img_matches):
                 img_data = base64.b64decode(img_base64)
@@ -274,7 +273,6 @@ def enviar_correos():
                 attachment = mail.Attachments.Add(temp_file.name)
                 attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", cid)
 
-                # Reemplaza el base64 original por el cid en el HTML
                 firmaHtml = firmaHtml.replace(f'data:image/{img_type};base64,{img_base64}', f'cid:{cid}')
 
             mail.HTMLBody = cuerpoFinal + firmaHtml

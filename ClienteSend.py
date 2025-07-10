@@ -1,5 +1,8 @@
+import base64
 import os
+import re
 import sys
+import tempfile
 import chardet
 import pandas as pd
 import win32com.client as win32
@@ -41,10 +44,10 @@ def cargar_proveedores():
         return
 
     try:
-        dataFilt = (data["Fecha Entrega"] < datetime.now()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
-        almFilt = data["Alm"] != "ED"
+        dataFilt = (data["Fecha Entrega"].dt.date < datetime.now().date()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
         mailFilt = (data["Email"] != "") & (data["Email"] != ".") & (data["Email"] != ",")
-        filt = data[(dataFilt) & (almFilt) & (mailFilt)]
+        artFilt = data["Artículo"].str.contains("UN-") == False
+        filt = data[(dataFilt) & (mailFilt) & (artFilt)]
 
         if filt.empty:
             messagebox.showinfo("No hay compras pendientes")
@@ -214,19 +217,20 @@ def enviar_correos():
     if not excelPath.get():
         messagebox.showerror("Error", "No has seleccionado ningún archivo Excel.")
         return
-    
+
     try:
         data = pd.read_excel(excelPath.get())
-        dataFilt = (data["Fecha Entrega"] < datetime.now()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
-        almFilt = data["Alm"] != "ED"
-        mailFilt = (data["Email"] != " ") & (data["Email"] != ".") & (data["Email"] != ",")
-        filt = data[(dataFilt) & (almFilt) & (mailFilt)]
-        
+        dataFilt = (data["Fecha Entrega"].dt.date < datetime.now().date()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
+        mailFilt = (data["Email"] != "") & (data["Email"] != ".") & (data["Email"] != ",")
+        artFilt = data["Artículo"].str.contains("UN-") == False
+        filt = data[(dataFilt) & (mailFilt) & (artFilt)]
+
         outlook = win32.Dispatch('Outlook.Application')
-        with open(resource_path("Assets/Mail/CAP_ES.txt"),"r",encoding='utf-8') as arch:
+        with open(resource_path("Assets/Mail/CAP_ES.txt"), "r", encoding='utf-8') as arch:
             asuntoBase = arch.read()
-        with open(resource_path("Assets/Mail/CUERPO_ES.txt"),"r",encoding='utf-8') as arch2:
+        with open(resource_path("Assets/Mail/CUERPO_ES.txt"), "r", encoding='utf-8') as arch2:
             cuerpoBase = arch2.read()
+
         firmaArchivo = firmaPath.get()
         if firmaArchivo:
             with open(firmaArchivo, "rb") as f:
@@ -235,30 +239,49 @@ def enviar_correos():
                 encoding = detected['encoding']
             firmaHtml = raw.decode(encoding)
         else:
-            firmaHtml = "<p>" + firmaText.get("1.0", tk.END).replace("\n","<br>") + "</p>"
+            firmaHtml = "<p>" + firmaText.get("1.0", tk.END).replace("\n", "<br>") + "</p>"
+
+        if not messagebox.askyesno(message="Se enviarán correos a los proveedores seleccionados. ¿Desea continuar?"):
+            return
 
         for correo, provVar, pedidosList in checkboxes:
             if not provVar.get():
                 continue
-            pedidos_a_enviar = [
-                str(p) for p, var in pedidosList if var.get()
-            ]
+            pedidos_a_enviar = [str(p) for p, var in pedidosList if var.get()]
             if not pedidos_a_enviar:
                 continue
-            pais = filt[filt["Email"]==correo].iloc[0]["Pais"]
+
+            pais = filt[filt["Email"] == correo].iloc[0]["Pais"]
+            asunto = asuntoBase
+            cuerpo = cuerpoBase
             if pais != "ES":
-                asuntoBase,cuerpoBase = traduccion(asuntoBase,cuerpoBase,pais)
+                asunto, cuerpo = traduccion(asunto, cuerpo, pais)
+
             mail = outlook.CreateItem(0)
             mail.To = correo
-            asuntoDef = asuntoBase + ", ".join(pedidos_a_enviar)
-            cuerpo = cuerpoBase.replace("pedidoN", ", ".join(pedidos_a_enviar))
-            htmlDef = cuerpo.replace("\n","<br>") + firmaHtml
-            mail.Subject = asuntoDef
-            mail.HTMLBody = htmlDef
-            if messagebox.askyesno(message="Se enviaran correos a los proveedores selecionados. ¿Desea continuar?"):
-                mail.Send()
-                messagebox.showinfo("OK", "Correos generados correctamente en Outlook.")
-                
+            mail.Subject = asunto + ", ".join(pedidos_a_enviar)
+            cuerpoFinal = cuerpo.replace("pedidoN", ", ".join(pedidos_a_enviar)).replace("\n", "<br>")
+
+            # --- Procesar imágenes Base64 embebidas ---
+            img_matches = re.findall(r'<img[^>]+src="data:image/(.*?);base64,(.*?)"', firmaHtml, re.DOTALL)
+            for i, (img_type, img_base64) in enumerate(img_matches):
+                img_data = base64.b64decode(img_base64)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{img_type}")
+                temp_file.write(img_data)
+                temp_file.close()
+
+                cid = f"img{i}"
+                attachment = mail.Attachments.Add(temp_file.name)
+                attachment.PropertyAccessor.SetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001F", cid)
+
+                # Reemplaza el base64 original por el cid en el HTML
+                firmaHtml = firmaHtml.replace(f'data:image/{img_type};base64,{img_base64}', f'cid:{cid}')
+
+            mail.HTMLBody = cuerpoFinal + firmaHtml
+            mail.Send()
+
+        messagebox.showinfo("OK", "Correos enviados correctamente.")
+
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un problema al enviar correos:\n{str(e)}")
 

@@ -41,10 +41,10 @@ def cargar_proveedores():
         return
 
     try:
-        dataFilt = (data["Fecha Entrega"] < datetime.now()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
-        almFilt = data["Alm"] != "ED"
+        dataFilt = (data["Fecha Entrega"].dt.date < datetime.now().date()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
         mailFilt = (data["Email"] != "") & (data["Email"] != ".") & (data["Email"] != ",")
-        filt = data[(dataFilt) & (almFilt) & (mailFilt)]
+        artFilt = data["Artículo"].str.contains("UN-") == False
+        filt = data[(dataFilt) & (mailFilt) & (artFilt)]
 
         if filt.empty:
             messagebox.showinfo("No hay compras pendientes")
@@ -217,11 +217,10 @@ def enviar_correos():
     
     try:
         data = pd.read_excel(excelPath.get())
-        dataFilt = (data["Fecha Entrega"] < datetime.now()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
-        almFilt = data["Alm"] != "ED"
-        mailFilt = (data["Email"] != " ") & (data["Email"] != ".") & (data["Email"] != ",")
-        filt = data[(dataFilt) & (almFilt) & (mailFilt)]
-        
+        dataFilt = (data["Fecha Entrega"].dt.date < datetime.now().date()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
+        mailFilt = (data["Email"] != "") & (data["Email"] != ".") & (data["Email"] != ",")
+        artFilt = data["Artículo"].str.contains("UN-") == False
+        filt = data[(dataFilt) & (mailFilt) & (artFilt)]
         outlook = win32.Dispatch('Outlook.Application')
         with open(resource_path("Assets/Mail/CAP_ES.txt"),"r",encoding='utf-8') as arch:
             asuntoBase = arch.read()

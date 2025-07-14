@@ -145,6 +145,11 @@ def cargar_proveedores():
                                         corner_radius=80, fg_color="transparent", border_color="grey",
                                         border_width=2, width=100, height=30)
         btnUAll.grid(padx=50,row=3,column=3,columnspan=3)
+        
+        with open(resource_path("Assets/Mail/CAP_ES.txt"),"r",encoding='utf-8') as arch:
+            AsuntoText.insert("1.0", arch.read())
+        with open(resource_path("Assets/Mail/CUERPO_ES.txt"),'r',encoding='utf-8') as arch2:
+            CuerpoText.insert("1.0", arch2.read())
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo procesar proveedores:\n{e}")
 
@@ -217,6 +222,8 @@ def enviar_correos():
     if not excelPath.get():
         messagebox.showerror("Error", "No has seleccionado ningún archivo Excel.")
         return
+    if not messagebox.askyesno(message="Se enviaran correos a los proveedores selecionados. ¿Desea continuar?"):
+        return
 
     try:
         data = pd.read_excel(excelPath.get())
@@ -226,11 +233,8 @@ def enviar_correos():
         filt = data[(dataFilt) & (mailFilt) & (artFilt)]
 
         outlook = win32.Dispatch('Outlook.Application')
-        with open(resource_path("Assets/Mail/CAP_ES.txt"), "r", encoding='utf-8') as arch:
-            asuntoBase = arch.read()
-        with open(resource_path("Assets/Mail/CUERPO_ES.txt"), "r", encoding='utf-8') as arch2:
-            cuerpoBase = arch2.read()
-
+        asuntoBase = AsuntoText.get("1.0", tk.END).strip()
+        cuerpoBase = CuerpoText.get("1.0", tk.END).strip()
         firmaArchivo = firmaPath.get()
         if firmaArchivo:
             with open(firmaArchivo, "rb") as f:
@@ -241,9 +245,6 @@ def enviar_correos():
         else:
             firmaHtml = "<p>" + firmaText.get("1.0", tk.END).replace("\n", "<br>") + "</p>"
 
-        if not messagebox.askyesno(message="Se enviarán correos a los proveedores seleccionados. ¿Desea continuar?"):
-            return
-
         for correo, provVar, pedidosList in checkboxes:
             if not provVar.get():
                 continue
@@ -252,15 +253,13 @@ def enviar_correos():
                 continue
 
             pais = filt[filt["Email"] == correo].iloc[0]["Pais"]
-            asunto = asuntoBase
-            cuerpo = cuerpoBase
             if pais != "ES":
-                asunto, cuerpo = traduccion(asunto, cuerpo, pais)
+                asuntoBase, cuerpoBase = traduccion(asuntoBase, cuerpoBase, pais)
 
             mail = outlook.CreateItem(0)
             mail.To = correo
-            mail.Subject = asunto + ", ".join(pedidos_a_enviar)
-            cuerpoFinal = cuerpo.replace("pedidoN", ", ".join(pedidos_a_enviar)).replace("\n", "<br>")
+            mail.Subject = asuntoBase + " " + ", ".join(pedidos_a_enviar)
+            cuerpoFinal = cuerpoBase.replace("{pedidoN}", ", ".join(pedidos_a_enviar)).replace("\n", "<br>")
 
             img_matches = re.findall(r'<img[^>]+src="data:image/(.*?);base64,(.*?)"', firmaHtml, re.DOTALL)
             for i, (img_type, img_base64) in enumerate(img_matches):
@@ -314,6 +313,14 @@ btnEnviar.grid(row=2, column=1, padx=20, pady=40)
 
 frameChecks = customtkinter.CTkScrollableFrame(ventana, width=300, height=200, border_width=2, border_color="grey")
 frameChecks.grid(row=2, column=0, columnspan=3, padx=15, pady=20, sticky="se")
+
+frameDisp = customtkinter.CTkFrame(ventana, fg_color="transparent", width=350, height=200)
+frameDisp.grid(row=2, column=0, padx=15, pady=20, sticky="w")
+
+AsuntoText = customtkinter.CTkTextbox(frameDisp, width=350, height=30, border_color="grey", border_width=2)
+AsuntoText.grid(row=1,pady=15,padx=15,sticky="ew")
+CuerpoText = customtkinter.CTkTextbox(frameDisp, width=350, height=150, border_color="grey", border_width=2)
+CuerpoText.grid(row=2,pady=15,padx=15,sticky="ew")
 
 ventana.grid_columnconfigure(0, weight=1)
 ventana.grid_columnconfigure(1, weight=1)

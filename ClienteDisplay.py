@@ -31,6 +31,8 @@ def seleccionarExcel():
 # Carga proveedores + pedidos en el frame
 def cargar_proveedores():
     archivoExcel = excelPath.get()
+    AsuntoText.delete("1.0", tk.END)
+    CuerpoText.delete("1.0", tk.END)
     if not archivoExcel:
         return
     
@@ -43,7 +45,7 @@ def cargar_proveedores():
     try:
         dataFilt = (data["Fecha Entrega"].dt.date < datetime.now().date()) & (data["Fecha Entrega"].dt.year == datetime.now().year)
         mailFilt = (data["Email"] != "") & (data["Email"] != ".") & (data["Email"] != ",")
-        artFilt = data["Artículo"].str.contains("UN-") == False
+        artFilt = (data["Artículo"].str.contains("UN-") == False) & (data["Artículo"].str.contains("PR-") == False)
         filt = data[(dataFilt) & (mailFilt) & (artFilt)]
 
         if filt.empty:

@@ -34,6 +34,8 @@ def seleccionarExcel():
 # Carga proveedores + pedidos en el frame
 def cargar_proveedores():
     archivoExcel = excelPath.get()
+    AsuntoText.delete("1.0", tk.END)
+    CuerpoText.delete("1.0", tk.END)
     if not archivoExcel:
         return
     
@@ -285,7 +287,7 @@ def enviar_correos():
 # UI
 ventana = customtkinter.CTk()
 ventana.title("Enviar Correos a Proveedores")
-ventana.geometry("1000x500")
+ventana.geometry("1175x550")
 ventana._set_appearance_mode("dark")
 
 excelPath = tk.StringVar()

@@ -1,5 +1,0 @@
-Bonjour à tous,
-
-Je vous écrivais pour consulter l’état de la commande numéro {pedidoN}.
-
-Cordialement,
